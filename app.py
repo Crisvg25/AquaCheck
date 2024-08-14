@@ -10,7 +10,7 @@ df = pd.read_csv('datos_agua.csv')
 app = dash.Dash(__name__)
 
 app.layout = html.Div(children=[
-    html.H1(children='Monitoreo de la Calidad del Agua'),
+    html.H1(children='Monitoreo de la Calidad del Agua en La Ceja'),
 
     # Gráfico de pH
     dcc.Graph(
