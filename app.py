@@ -1,6 +1,5 @@
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html  # Importaciones actualizadas
 import pandas as pd
 
 # Leer el archivo CSV
@@ -66,5 +65,6 @@ app.layout = html.Div(children=[
 ])
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
-
+    import os
+    port = int(os.environ.get("PORT", 8050))  # Uso la variable de entorno PORT
+    app.run_server(debug=True, port=port)  # Cambio el puerto aquí
