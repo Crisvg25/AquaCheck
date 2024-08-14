@@ -48,7 +48,7 @@ def update_graph(n_clicks, fecha, hora, ph, turbidez, conductividad, temperatura
     if n_clicks > 0:
         # Verificar que los valores no sean None
         if not all([fecha, hora, ph, turbidez, conductividad, temperatura]):
-            return dash.no_update  # No actualizar si falta algún valor
+            return dash.no_update, dash.no_update, dash.no_update, dash.no_update  # No actualizar si falta algún valor
 
         # Agregar los nuevos datos al DataFrame
         new_data = {'Fecha': fecha, 'Hora': hora, 'pH': ph, 'Turbidez': turbidez,
@@ -85,4 +85,3 @@ def update_graph(n_clicks, fecha, hora, ph, turbidez, conductividad, temperatura
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run_server(host='0.0.0.0', port=port, debug=True)
-
