@@ -48,13 +48,14 @@ def update_graph(n_clicks, fecha, hora, ph, turbidez, conductividad, temperatura
     if n_clicks > 0:
         # Verificar que los valores no sean None
         if not all([fecha, hora, ph, turbidez, conductividad, temperatura]):
-            return dash.no_update, dash.no_update, dash.no_update, dash.no_update  # No actualizar si falta algún valor
+            return dash.no_update  # No actualizar si falta algún valor
 
         # Agregar los nuevos datos al DataFrame
-        new_data = {'Fecha': fecha, 'Hora': hora, 'pH': ph, 'Turbidez': turbidez,
-                    'Conductividad': conductividad, 'Temperatura': temperatura}
+        new_data = pd.DataFrame({'Fecha': [fecha], 'Hora': [hora], 'pH': [ph], 
+                                 'Turbidez': [turbidez], 'Conductividad': [conductividad], 
+                                 'Temperatura': [temperatura]})
         global df
-        df = df.append(new_data, ignore_index=True)
+        df = pd.concat([df, new_data], ignore_index=True)
 
         # Actualizar el archivo CSV con los nuevos datos
         df.to_csv('datos_agua.csv', index=False)
