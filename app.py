@@ -1,12 +1,16 @@
 import dash
-from dash import dcc, html  # Importaciones actualizadas
+from dash import dcc, html
 import pandas as pd
+import os
 
 # Leer el archivo CSV
 df = pd.read_csv('datos_agua.csv')
 
 # Crear la aplicación Dash
 app = dash.Dash(__name__)
+
+# Importante: esto es necesario para Render
+server = app.server
 
 app.layout = html.Div(children=[
     html.H1(children='Monitoreo de la Calidad del Agua en La Ceja'),
@@ -65,6 +69,5 @@ app.layout = html.Div(children=[
 ])
 
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 8050))  # Uso la variable de entorno PORT
-    app.run_server(debug=True, port=port)  # Cambio el puerto aquí
+    port = int(os.environ.get("PORT", 10000))
+    app.run_server(host='0.0.0.0', port=port, debug=False)
