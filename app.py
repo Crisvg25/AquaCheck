@@ -6,7 +6,7 @@ import os
 from flask import g
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
-import os
+import logging
 
 def get_db():
     db = getattr(g, '_database', None)
@@ -24,6 +24,7 @@ def close_connection(exception):
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
+        logging.info("Conexión a la base de datos cerrada")
 
 with app.server.app_context():
     db = get_db()
@@ -124,7 +125,8 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
                     VALUES (?, ?, ?, ?, ?, ?)
                 ''', (fecha, hora, ph, turbidez, conductividad, temperatura))
                 db.commit()
-    
+                logging.info("Datos agregados a la base de datos")
+
     elif ctx.triggered[0]['prop_id'] == 'delete-button.n_clicks':
         if selected_rows:
             with app.server.app_context():
@@ -133,6 +135,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
                 for row in selected_rows:
                     cursor.execute("DELETE FROM mediciones WHERE id=?", (row,))
                 db.commit()
+                logging.info("Datos eliminados de la base de datos")
 
     with app.server.app_context():
         query = f"SELECT * FROM mediciones WHERE fecha BETWEEN '{start_date}' AND '{end_date}'"
@@ -190,4 +193,5 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
+    logging.basicConfig(level=logging.INFO)
     app.run_server(host='0.0.0.0', port=port, debug=True)
