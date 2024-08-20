@@ -6,11 +6,14 @@ import os
 from flask import g
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
+import os
 
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect('agua.db')
+        # Obtén la conexión a la base de datos de las variables de entorno de Render
+        db_path = os.environ.get('DATABASE_URL', 'agua.db')
+        db = g._database = sqlite3.connect(db_path)
     return db
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -142,7 +145,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
             {'x': df['fecha'] + ' ' + df['hora'], 'y': [9.0] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
         ],
         'layout': {
-            'title': {'text': 'Nivel de pH en el Agua', 'font': {'size': 24}},
+            'title': {'text': '<b>Nivel de pH en el Agua</b>', 'font': {'size': 24}},
             'yaxis': {'range': [0, 14]},
             'hovermode': 'closest'
         }
@@ -154,7 +157,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
             {'x': df['fecha'] + ' ' + df['hora'], 'y': [5] * len(df), 'type': 'line', 'name': 'Límite máximo', 'line': {'dash': 'dash'}}
         ],
         'layout': {
-            'title': {'text': 'Turbidez del Agua', 'font': {'size': 24}},
+            'title': {'text': '<b>Turbidez del Agua</b>', 'font': {'size': 24}},
             'hovermode': 'closest'
         }
     }
@@ -166,7 +169,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
             {'x': df['fecha'] + ' ' + df['hora'], 'y': [1000] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
         ],
         'layout': {
-            'title': {'text': 'Conductividad del Agua', 'font': {'size': 24}},
+            'title': {'text': '<b>Conductividad del Agua</b>', 'font': {'size': 24}},
             'hovermode': 'closest'
         }
     }
@@ -178,7 +181,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
             {'x': df['fecha'] + ' ' + df['hora'], 'y': [20] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
         ],
         'layout': {
-            'title': {'text': 'Temperatura del Agua', 'font': {'size': 24}},
+            'title': {'text': '<b>Temperatura del Agua</b>', 'font': {'size': 24}},
             'hovermode': 'closest'
         }
     }
