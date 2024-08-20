@@ -1,10 +1,30 @@
 import dash
 from dash import dcc, html, Input, Output, State
 import pandas as pd
+import sqlite3
 import os
 
-# Leer el archivo CSV
-df = pd.read_csv('datos_agua.csv')
+# Conexión a la base de datos SQLite
+conn = sqlite3.connect('agua.db')
+cursor = conn.cursor()
+
+# Crear la tabla si no existe
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS mediciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT,
+    hora TEXT,
+    ph REAL,
+    turbidez REAL,
+    conductividad REAL,
+    temperatura REAL
+)
+''')
+
+conn.commit()
+
+# Leer los datos iniciales de la base de datos
+df = pd.read_sql_query("SELECT * FROM mediciones", conn)
 
 # Crear la aplicación Dash
 app = dash.Dash(__name__)
@@ -45,39 +65,41 @@ app.layout = html.Div(children=[
      State('conductividad', 'value'), State('temperatura', 'value')]
 )
 def update_graph(n_clicks, fecha, hora, ph, turbidez, conductividad, temperatura):
+    global df
+
     if n_clicks > 0:
         # Verificar que los valores no sean None
         if not all([fecha, hora, ph, turbidez, conductividad, temperatura]):
             return dash.no_update  # No actualizar si falta algún valor
 
-        # Agregar los nuevos datos al DataFrame
-        new_data = pd.DataFrame({'Fecha': [fecha], 'Hora': [hora], 'pH': [ph], 
-                                 'Turbidez': [turbidez], 'Conductividad': [conductividad], 
-                                 'Temperatura': [temperatura]})
-        global df
-        df = pd.concat([df, new_data], ignore_index=True)
+        # Agregar los nuevos datos a la base de datos
+        cursor.execute('''
+            INSERT INTO mediciones (fecha, hora, ph, turbidez, conductividad, temperatura)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (fecha, hora, ph, turbidez, conductividad, temperatura))
+        conn.commit()
 
-        # Actualizar el archivo CSV con los nuevos datos
-        df.to_csv('datos_agua.csv', index=False)
+        # Leer los datos actualizados de la base de datos
+        df = pd.read_sql_query("SELECT * FROM mediciones", conn)
 
     # Crear gráficos actualizados
     ph_fig = {
-        'data': [{'x': df['Fecha'] + ' ' + df['Hora'], 'y': df['pH'], 'type': 'line', 'name': 'pH'}],
+        'data': [{'x': df['fecha'] + ' ' + df['hora'], 'y': df['ph'], 'type': 'line', 'name': 'pH'}],
         'layout': {'title': 'Nivel de pH en el Agua'}
     }
 
     turbidez_fig = {
-        'data': [{'x': df['Fecha'] + ' ' + df['Hora'], 'y': df['Turbidez'], 'type': 'line', 'name': 'Turbidez'}],
+        'data': [{'x': df['fecha'] + ' ' + df['hora'], 'y': df['turbidez'], 'type': 'line', 'name': 'Turbidez'}],
         'layout': {'title': 'Turbidez del Agua'}
     }
 
     conductividad_fig = {
-        'data': [{'x': df['Fecha'] + ' ' + df['Hora'], 'y': df['Conductividad'], 'type': 'line', 'name': 'Conductividad'}],
+        'data': [{'x': df['fecha'] + ' ' + df['hora'], 'y': df['conductividad'], 'type': 'line', 'name': 'Conductividad'}],
         'layout': {'title': 'Conductividad del Agua'}
     }
 
     temperatura_fig = {
-        'data': [{'x': df['Fecha'] + ' ' + df['Hora'], 'y': df['Temperatura'], 'type': 'line', 'name': 'Temperatura'}],
+        'data': [{'x': df['fecha'] + ' ' + df['hora'], 'y': df['temperatura'], 'type': 'line', 'name': 'Temperatura'}],
         'layout': {'title': 'Temperatura del Agua'}
     }
 
