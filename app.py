@@ -14,6 +14,7 @@ def get_db():
         # Obtén la conexión a la base de datos de las variables de entorno de Render
         db_path = os.environ.get('DATABASE_URL', 'agua.db')
         db = g._database = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row  # Para que los resultados de la consulta se puedan acceder por nombre de columna
     return db
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -115,7 +116,8 @@ app.layout = dbc.Container([
 )
 def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, turbidez, conductividad, temperatura, selected_rows):
     ctx = dash.callback_context
-    if ctx.triggered[0]['prop_id'] == 'submit-button.n_clicks':
+
+    if ctx.triggered[0]['prop_id'] == 'submit-button.n_clicks' and n_clicks:
         if all([fecha, hora, ph, turbidez, conductividad, temperatura]):
             with app.server.app_context():
                 db = get_db()
@@ -127,19 +129,19 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
                 db.commit()
                 logging.info("Datos agregados a la base de datos")
 
-    elif ctx.triggered[0]['prop_id'] == 'delete-button.n_clicks':
+    elif ctx.triggered[0]['prop_id'] == 'delete-button.n_clicks' and delete_clicks:
         if selected_rows:
             with app.server.app_context():
                 db = get_db()
                 cursor = db.cursor()
                 for row in selected_rows:
-                    cursor.execute("DELETE FROM mediciones WHERE id=?", (row,))
+                    cursor.execute("DELETE FROM mediciones WHERE id=?", (row['id'],))
                 db.commit()
                 logging.info("Datos eliminados de la base de datos")
 
     with app.server.app_context():
-        query = f"SELECT * FROM mediciones WHERE fecha BETWEEN '{start_date}' AND '{end_date}'"
-        df = pd.read_sql_query(query, get_db())
+        query = f"SELECT * FROM mediciones WHERE fecha BETWEEN ? AND ?"
+        df = pd.read_sql_query(query, get_db(), params=[start_date, end_date])
 
     ph_fig = {
         'data': [
@@ -181,7 +183,7 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
         'data': [
             {'x': df['fecha'] + ' ' + df['hora'], 'y': df['temperatura'], 'type': 'scatter', 'mode': 'lines+markers', 'name': 'Temperatura'},
             {'x': df['fecha'] + ' ' + df['hora'], 'y': [10] * len(df), 'type': 'line', 'name': 'Límite inferior', 'line': {'dash': 'dash'}},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [20] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
+            {'x': df['fecha'] + ' ' + df['hora'], 'y': [30] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
         ],
         'layout': {
             'title': {'text': '<b>Temperatura del Agua</b>', 'font': {'size': 24}},
@@ -192,6 +194,4 @@ def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, 
     return ph_fig, turbidez_fig, conductividad_fig, temperatura_fig, df.to_dict('records')
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    logging.basicConfig(level=logging.INFO)
-    app.run_server(host='0.0.0.0', port=port, debug=True)
+    app.run_server(debug=True)
