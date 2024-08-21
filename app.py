@@ -3,9 +3,7 @@ import sqlite3
 import os
 from flask import g
 import dash
-from dash import dcc, html, dash_table, Output, Input
-from dash import html, dcc  
-from dash import dash_table 
+from dash import dcc, html, dash_table, Output, Input, State  # Añade 'State' aquí
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 import logging
