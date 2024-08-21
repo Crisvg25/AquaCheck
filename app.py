@@ -6,192 +6,141 @@ import os
 from flask import g
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
-import logging
 
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+# Función para obtener la conexión a la base de datos
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        # Obtén la conexión a la base de datos de las variables de entorno de Render
-        db_path = os.environ.get('DATABASE_URL', 'agua.db')
-        db = g._database = sqlite3.connect(db_path)
-        db.row_factory = sqlite3.Row  # Para que los resultados de la consulta se puedan acceder por nombre de columna
+        db = g._database = sqlite3.connect('database.db')
     return db
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server
+# Ruta para la página principal
+@app.route('/')
+def index():
+    return app.index()
 
-@server.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
-        logging.info("Conexión a la base de datos cerrada")
-
-with app.server.app_context():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS mediciones (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        hora TEXT,
-        ph REAL,
-        turbidez REAL,
-        conductividad REAL,
-        temperatura REAL
-    )
-    ''')
-    db.commit()
-
-app.layout = dbc.Container([
-    html.H1("AquaCheck La Ceja", className="text-center my-4"),
-    
-    dbc.Row([
-        dbc.Col([
-            html.H3("Agregar nueva medición", className="mb-3 text-primary"),
-            dbc.Form([
-                dbc.Row([
-                    dbc.Col(dbc.Input(id='fecha', type='date', placeholder='Fecha')),
-                    dbc.Col(dbc.Input(id='hora', type='time', placeholder='Hora')),
-                ], className="mb-3"),
-                dbc.Row([
-                    dbc.Col(dbc.Input(id='ph', type='number', placeholder='pH')),
-                    dbc.Col(dbc.Input(id='turbidez', type='number', placeholder='Turbidez')),
-                ], className="mb-3"),
-                dbc.Row([
-                    dbc.Col(dbc.Input(id='conductividad', type='number', placeholder='Conductividad')),
-                    dbc.Col(dbc.Input(id='temperatura', type='number', placeholder='Temperatura')),
-                ], className="mb-3"),
-                dbc.Button('Agregar', id='submit-button', color="primary", className="mt-3"),
-            ]),
-        ], md=4),
-        dbc.Col([
-            html.H3("Filtrar datos", className="mb-3 text-primary"),
-            dcc.DatePickerRange(
-                id='date-range',
-                start_date=datetime.now().date() - timedelta(days=30),
-                end_date=datetime.now().date(),
-                display_format='YYYY-MM-DD'
-            ),
-        ], md=8),
-    ], className="mb-4"),
-    
-    html.H3("Datos ingresados", className="mb-3 text-primary"),
-    dash_table.DataTable(
-        id='table',
-        columns=[
-            {"name": i, "id": i} for i in ["id", "fecha", "hora", "ph", "turbidez", "conductividad", "temperatura"]
-        ],
-        page_size=10,
-        style_table={'overflowX': 'auto'},
-    ),
-    dbc.Button('Eliminar seleccionados', id='delete-button', color="danger", className="mt-3"),
-    
-    dbc.Spinner(children=[
-        dbc.Row([
-            dbc.Col(dcc.Graph(id='ph-graph'), md=6),
-            dbc.Col(dcc.Graph(id='turbidez-graph'), md=6),
-        ], className="mb-4"),
-        dbc.Row([
-            dbc.Col(dcc.Graph(id='conductividad-graph'), md=6),
-            dbc.Col(dcc.Graph(id='temperatura-graph'), md=6),
-        ]),
-    ], color="primary", type="grow", fullscreen=True),
+# Diseño de la interfaz
+app.layout = html.Div([
+    html.H1("Monitoreo de Calidad de Agua"),
+    html.Div([
+        html.Label("Fecha inicio:"),
+        dcc.DatePickerSingle(
+            id='start-date',
+            date=datetime.now().date() - timedelta(days=7)
+        ),
+        html.Label("Fecha fin:"),
+        dcc.DatePickerSingle(
+            id='end-date',
+            date=datetime.now().date()
+        ),
+        html.Button('Actualizar', id='submit-button', n_clicks=0)
+    ]),
+    html.Div([
+        html.H2("Tabla de Datos"),
+        dash_table.DataTable(id='data-table'),
+        html.H2("Gráficas"),
+        dcc.Graph(id='ph-graph'),
+        dcc.Graph(id='turbidity-graph'),
+        dcc.Graph(id='conductivity-graph'),
+        dcc.Graph(id='temp-graph')
+    ]),
+    html.Div([
+        html.H2("Agregar Datos"),
+        dbc.Input(id='ph-input', type='number', placeholder='pH'),
+        dbc.Input(id='turbidity-input', type='number', placeholder='Turbidez'),
+        dbc.Input(id='conductivity-input', type='number', placeholder='Conductividad'),
+        dbc.Input(id='temp-input', type='number', placeholder='Temperatura'),
+        html.Button('Agregar', id='submit-button', n_clicks=0)
+    ]),
+    html.Div([
+        html.H2("Eliminar Datos"),
+        dash_table.DataTable(id='delete-table', editable=True),
+        html.Button('Eliminar', id='delete-button', n_clicks=0)
+    ])
 ])
 
+# Actualizar datos de la tabla y gráficas
 @app.callback(
-    [Output('ph-graph', 'figure'),
-     Output('turbidez-graph', 'figure'),
-     Output('conductividad-graph', 'figure'),
-     Output('temperatura-graph', 'figure'),
-     Output('table', 'data')],
+    [Output('data-table', 'data'),
+     Output('ph-graph', 'figure'),
+     Output('turbidity-graph', 'figure'),
+     Output('conductivity-graph', 'figure'),
+     Output('temp-graph', 'figure')],
     [Input('submit-button', 'n_clicks'),
-     Input('date-range', 'start_date'),
-     Input('date-range', 'end_date'),
-     Input('delete-button', 'n_clicks')],
-    [State('fecha', 'value'), State('hora', 'value'),
-     State('ph', 'value'), State('turbidez', 'value'),
-     State('conductividad', 'value'), State('temperatura', 'value'),
-     State('table', 'selected_rows')]
-)
-def update_data(n_clicks, start_date, end_date, delete_clicks, fecha, hora, ph, turbidez, conductividad, temperatura, selected_rows):
+     Input('start-date', 'date'),
+     Input('end-date', 'date')])
+def update_data(n_clicks, start_date, end_date):
     ctx = dash.callback_context
-
-    if ctx.triggered[0]['prop_id'] == 'submit-button.n_clicks' and n_clicks:
-        if all([fecha, hora, ph, turbidez, conductividad, temperatura]):
-            with app.server.app_context():
-                db = get_db()
-                cursor = db.cursor()
-                cursor.execute('''
-                    INSERT INTO mediciones (fecha, hora, ph, turbidez, conductividad, temperatura)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (fecha, hora, ph, turbidez, conductividad, temperatura))
-                db.commit()
-                logging.info("Datos agregados a la base de datos")
-
-    elif ctx.triggered[0]['prop_id'] == 'delete-button.n_clicks' and delete_clicks:
-        if selected_rows:
-            with app.server.app_context():
-                db = get_db()
-                cursor = db.cursor()
-                for row in selected_rows:
-                    cursor.execute("DELETE FROM mediciones WHERE id=?", (row['id'],))
-                db.commit()
-                logging.info("Datos eliminados de la base de datos")
-
-    with app.server.app_context():
-        query = f"SELECT * FROM mediciones WHERE fecha BETWEEN ? AND ?"
+    if ctx.triggered[0]['prop_id'] == 'submit-button.n_clicks' and n_clicks > 0:
+        # Obtener datos de la base de datos
+        query = "SELECT * FROM mediciones WHERE fecha BETWEEN ? AND ?"
         df = pd.read_sql_query(query, get_db(), params=[start_date, end_date])
 
-    ph_fig = {
-        'data': [
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': df['ph'], 'type': 'scatter', 'mode': 'lines+markers', 'name': 'pH'},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [6.5] * len(df), 'type': 'line', 'name': 'Límite inferior', 'line': {'dash': 'dash'}},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [9.0] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
-        ],
-        'layout': {
-            'title': {'text': '<b>Nivel de pH en el Agua</b>', 'font': {'size': 24}},
-            'yaxis': {'range': [0, 14]},
-            'hovermode': 'closest'
-        }
-    }
+        # Generar gráficas
+        ph_fig = px.line(df, x='fecha', y='ph')
+        turbidity_fig = px.line(df, x='fecha', y='turbidez')
+        conductivity_fig = px.line(df, x='fecha', y='conductividad')
+        temp_fig = px.line(df, x='fecha', y='temperatura')
 
-    turbidez_fig = {
-        'data': [
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': df['turbidez'], 'type': 'scatter', 'mode': 'lines+markers', 'name': 'Turbidez'},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [5] * len(df), 'type': 'line', 'name': 'Límite máximo', 'line': {'dash': 'dash'}}
-        ],
-        'layout': {
-            'title': {'text': '<b>Turbidez del Agua</b>', 'font': {'size': 24}},
-            'hovermode': 'closest'
-        }
-    }
+        # Actualizar tabla de datos
+        return df.to_dict('records'), ph_fig, turbidity_fig, conductivity_fig, temp_fig
+    else:
+        return [], {}, {}, {}, {}
 
-    conductividad_fig = {
-        'data': [
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': df['conductividad'], 'type': 'scatter', 'mode': 'lines+markers', 'name': 'Conductividad'},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [50] * len(df), 'type': 'line', 'name': 'Límite inferior', 'line': {'dash': 'dash'}},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [1000] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
-        ],
-        'layout': {
-            'title': {'text': '<b>Conductividad del Agua</b>', 'font': {'size': 24}},
-            'hovermode': 'closest'
-        }
-    }
+# Agregar nuevos datos
+@app.callback(
+    Output('data-table', 'data'),
+    [Input('submit-button', 'n_clicks'),
+     State('ph-input', 'value'),
+     State('turbidity-input', 'value'),
+     State('conductivity-input', 'value'),
+     State('temp-input', 'value')])
+def add_data(n_clicks, ph, turbidity, conductivity, temp):
+    ctx = dash.callback_context
+    if ctx.triggered[0]['prop_id'] == 'submit-button.n_clicks' and n_clicks > 0:
+        # Validar valores de entrada
+        if (isinstance(ph, (int, float)) and isinstance(turbidity, (int, float)) and
+            isinstance(conductivity, (int, float)) and isinstance(temp, (int, float))):
+            # Insertar datos en la base de datos
+            cur = get_db().cursor()
+            cur.execute("INSERT INTO mediciones (ph, turbidez, conductividad, temperatura, fecha) VALUES (?, ?, ?, ?, ?)", 
+                       (ph, turbidity, conductivity, temp, datetime.now().date()))
+            get_db().commit()
 
-    temperatura_fig = {
-        'data': [
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': df['temperatura'], 'type': 'scatter', 'mode': 'lines+markers', 'name': 'Temperatura'},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [10] * len(df), 'type': 'line', 'name': 'Límite inferior', 'line': {'dash': 'dash'}},
-            {'x': df['fecha'] + ' ' + df['hora'], 'y': [30] * len(df), 'type': 'line', 'name': 'Límite superior', 'line': {'dash': 'dash'}}
-        ],
-        'layout': {
-            'title': {'text': '<b>Temperatura del Agua</b>', 'font': {'size': 24}},
-            'hovermode': 'closest'
-        }
-    }
+            # Obtener los datos actualizados de la base de datos
+            query = "SELECT * FROM mediciones"
+            df = pd.read_sql_query(query, get_db())
+            return df.to_dict('records')
+        else:
+            return dash.no_update
+    else:
+        return dash.no_update
 
-    return ph_fig, turbidez_fig, conductividad_fig, temperatura_fig, df.to_dict('records')
+# Eliminar datos
+@app.callback(
+    Output('data-table', 'data'),
+    [Input('delete-button', 'n_clicks'),
+     State('delete-table', 'data'),
+     State('delete-table', 'selected_rows')])
+def delete_data(delete_clicks, rows, selected_rows):
+    ctx = dash.callback_context
+    if ctx.triggered[0]['prop_id'] == 'delete-button.n_clicks' and delete_clicks > 0:
+        # Eliminar los datos seleccionados de la base de datos
+        cur = get_db().cursor()
+        for row_index in selected_rows:
+            row = rows[row_index]
+            cur.execute("DELETE FROM mediciones WHERE id = ?", (row['id'],))
+        get_db().commit()
+
+        # Obtener los datos actualizados de la base de datos
+        query = "SELECT * FROM mediciones"
+        df = pd.read_sql_query(query, get_db())
+        return df.to_dict('records')
+    else:
+        return dash.no_update
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    port = int(os.environ.get("PORT", 8000))
+    app.run_server(host='0.0.0.0', port=port, debug=True)
