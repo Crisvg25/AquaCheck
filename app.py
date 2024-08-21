@@ -6,6 +6,7 @@ import os
 from flask import g
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
+import plotly.express as px
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -15,11 +16,6 @@ def get_db():
     if db is None:
         db = g._database = sqlite3.connect('database.db')
     return db
-
-# Ruta para la página principal
-@app.route('/')
-def index():
-    return app.index()
 
 # Diseño de la interfaz
 app.layout = html.Div([
