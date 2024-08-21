@@ -2,6 +2,7 @@ import pandas as pd
 import sqlite3
 import os
 from flask import g
+import dash
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 import logging
